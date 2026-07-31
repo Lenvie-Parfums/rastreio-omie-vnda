@@ -1,0 +1,22 @@
+name: Diagnostico Rastreio (dry-run)
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  diagnostico:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install requests python-dotenv
+      - name: Rodar diagnostico
+        env:
+          APP_KEY_OMIE:    ${{ secrets.APP_KEY_OMIE }}
+          APP_SECRET:      ${{ secrets.APP_SECRET }}
+          VNDA_BASE_URL:   ${{ secrets.VNDA_BASE_URL }}
+          VNDA_TOKEN:      ${{ secrets.VNDA_TOKEN }}
+          VNDA_SHOP_HOST:  ${{ secrets.VNDA_SHOP_HOST }}
+        run: python diagnostico_rastreio.py

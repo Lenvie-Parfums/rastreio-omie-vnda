@@ -1,0 +1,26 @@
+name: Sincronizar Rastreio (Omie -> Vnda)
+
+on:
+  schedule:
+    # A cada 2 horas durante o horário comercial (SP = UTC-3)
+    - cron: '0 11,13,15,17,19,21 * * *'
+  workflow_dispatch: {}
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements.txt
+      - name: Rodar sincronizacao
+        env:
+          APP_KEY_OMIE:    ${{ secrets.APP_KEY_OMIE }}
+          APP_SECRET:      ${{ secrets.APP_SECRET }}
+          DIAS_RETROATIVOS: ${{ secrets.DIAS_RETROATIVOS }}
+          VNDA_BASE_URL:   ${{ secrets.VNDA_BASE_URL }}
+          VNDA_TOKEN:      ${{ secrets.VNDA_TOKEN }}
+          VNDA_SHOP_HOST:  ${{ secrets.VNDA_SHOP_HOST }}
+        run: python main.py
