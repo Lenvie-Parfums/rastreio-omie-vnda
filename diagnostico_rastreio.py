@@ -36,14 +36,13 @@ VNDA_SHOP_HOST = os.getenv("VNDA_SHOP_HOST")
 TZ_SP = ZoneInfo("America/Sao_Paulo")
 SEPARADOR = "=" * 60
 
-
 def vnda_headers():
     return {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {VNDA_TOKEN}",
-        "X-Shop-Host": VNDA_SHOP_HOST,
+        "accept":        "application/json",
+        "content-type":  "application/json",
+        "authorization": f"Bearer {VNDA_TOKEN}",
+        "x-shop-host":   VNDA_SHOP_HOST,
     }
-
 
 # ============================================================
 # PASSO 1 — Autenticação Vnda
