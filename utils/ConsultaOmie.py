@@ -26,12 +26,14 @@ def _post_omie(payload, max_retries=3, retry_delay=10):
             time.sleep(retry_delay)
     return None
 
+DATA_INICIO = os.getenv("DATA_INICIO_RASTREIO", "20/07/2026")
+
 def listar_pedidos_com_rastreio():
     resultados = []
-    vistos = set()  # evita duplicatas entre etapas
+    vistos = set()
 
     for etapa in ETAPAS:
-        log.info(f"Buscando pedidos na etapa {etapa}...")
+        log.info(f"Buscando pedidos na etapa {etapa} desde {DATA_INICIO}...")
         pagina = 1
         total_paginas = 1
 
@@ -43,7 +45,11 @@ def listar_pedidos_com_rastreio():
                     "pagina": pagina,
                     "registros_por_pagina": 50,
                     "apenas_importado_api": "N",
-                    "etapa": etapa
+                    "etapa": etapa,
+                    "filtrar_por_data_de":  DATA_INICIO,
+                    "filtrar_por_data_ate": __import__('datetime').datetime.now(
+                        __import__('zoneinfo').ZoneInfo("America/Sao_Paulo")
+                    ).strftime("%d/%m/%Y")
                 }]
             }
             resp = _post_omie(payload)
