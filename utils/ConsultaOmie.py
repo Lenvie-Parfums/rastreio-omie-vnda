@@ -11,6 +11,10 @@ APP_SECRET = os.getenv("APP_SECRET")
 TZ_SP = ZoneInfo("America/Sao_Paulo")
 DIAS_RETROATIVOS = int(os.getenv("DIAS_RETROATIVOS", "3"))
 
+# Etapas válidas para envio de rastreio:
+# 70 = Faturado, 80 = Expedido, 90 = Entregue
+ETAPAS_VALIDAS = {"70", "80", "90"}
+
 def _post_omie(payload, max_retries=3, retry_delay=10):
     for tentativa in range(1, max_retries + 1):
         try:
@@ -32,6 +36,7 @@ def listar_pedidos_com_rastreio():
     data_de  = (hoje - timedelta(days=DIAS_RETROATIVOS)).strftime("%d/%m/%Y")
     data_ate = hoje.strftime("%d/%m/%Y")
     resultados = []
+    pulados_etapa = 0
     pagina = 1
     total_paginas = 1
 
@@ -57,8 +62,16 @@ def listar_pedidos_com_rastreio():
             frete = ped.get("frete", {})
             order_code = cab.get("codigo_pedido_integracao", "").strip()
             numero     = cab.get("numero_pedido", "")
+            etapa      = str(cab.get("etapa", "")).strip()
             rastreio   = frete.get("codigo_rastreio", "") or frete.get("link_rastreio", "") or ""
             transp     = str(frete.get("codigo_transportadora", "") or "")
+
+            # Só processa pedidos em etapa válida (70+)
+            if etapa not in ETAPAS_VALIDAS:
+                if rastreio and order_code:
+                    pulados_etapa += 1
+                continue
+
             if rastreio and order_code:
                 resultados.append({
                     "numero_pedido":            numero,
@@ -66,10 +79,14 @@ def listar_pedidos_com_rastreio():
                     "codigo_rastreio":          rastreio,
                     "url_rastreio":             rastreio,
                     "transportadora":           transp,
+                    "etapa":                    etapa,
                 })
+
         log.info(f"Pagina {pagina}/{total_paginas} processada.")
         pagina += 1
         time.sleep(0.5)
 
-    log.info(f"Total pedidos com rastreio e order_code: {len(resultados)}")
+    log.info(f"Pedidos com rastreio em etapa valida (70+): {len(resultados)}")
+    if pulados_etapa:
+        log.info(f"Pedidos com rastreio mas etapa invalida (60): {pulados_etapa} — aguardando faturamento")
     return resultados
