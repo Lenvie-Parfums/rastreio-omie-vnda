@@ -42,9 +42,12 @@ def ja_tem_rastreio(order_code, package_code):
         log.info(f"[{order_code}] GET trackings status={resp.status_code} retorno={resp.text[:200]}")
         if resp.status_code == 200:
             trackings = resp.json()
-            if isinstance(trackings, list) and len(trackings) > 0:
-                log.info(f"[{order_code}] Ja tem {len(trackings)} rastreio(s). Pulando.")
-                return True
+            if isinstance(trackings, list):
+                # Verifica se tem ao menos um tracking com campo 'code' preenchido
+                validos = [t for t in trackings if t.get("code") or t.get("tracking_code")]
+                if validos:
+                    log.info(f"[{order_code}] Ja tem {len(validos)} rastreio(s) valido(s). Pulando.")
+                    return True
         return False
     except requests.exceptions.RequestException as e:
         log.warning(f"[{order_code}] Erro ao verificar rastreio: {e}")
