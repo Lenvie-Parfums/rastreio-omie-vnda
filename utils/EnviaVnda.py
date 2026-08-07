@@ -16,6 +16,11 @@ def _headers():
     }
 
 def buscar_package_code(order_code, max_retries=3):
+    """
+    Busca o package_code do pedido.
+    Tenta primeiro GET /packages, depois GET /orders/{code} como fallback.
+    """
+    # Tentativa 1 — endpoint de pacotes
     url = f"{VNDA_BASE_URL}/api/v2/orders/{order_code}/packages"
     for tentativa in range(1, max_retries + 1):
         try:
@@ -23,16 +28,35 @@ def buscar_package_code(order_code, max_retries=3):
             if resp.status_code == 200:
                 pacotes = resp.json()
                 if isinstance(pacotes, list) and pacotes:
+                    log.info(f"[{order_code}] Pacote encontrado via /packages: {pacotes[0].get('code')}")
                     return pacotes[0].get("code")
-                return None
+                break  # lista vazia — tenta fallback
             elif resp.status_code == 404:
                 log.warning(f"[{order_code}] Pedido nao encontrado na Vnda.")
                 return None
             else:
-                log.warning(f"[{order_code}] Erro {resp.status_code}: {resp.text[:200]}")
+                log.warning(f"[{order_code}] Erro {resp.status_code}: {resp.text[:100]}")
         except requests.exceptions.RequestException as e:
             log.warning(f"[{order_code}] Falha: {e}")
         time.sleep(5)
+
+    # Tentativa 2 — busca no objeto do pedido
+    log.info(f"[{order_code}] Tentando buscar pacote via GET /orders/{order_code}...")
+    try:
+        resp2 = requests.get(
+            f"{VNDA_BASE_URL}/api/v2/orders/{order_code}",
+            headers=_headers(), timeout=30)
+        log.info(f"[{order_code}] GET order status={resp2.status_code} retorno={resp2.text[:300]}")
+        if resp2.status_code == 200:
+            pedido = resp2.json()
+            pacotes = pedido.get("packages", [])
+            if pacotes:
+                log.info(f"[{order_code}] Pacote encontrado via /orders: {pacotes[0].get('code')}")
+                return pacotes[0].get("code")
+            log.warning(f"[{order_code}] Nenhum pacote no pedido.")
+    except requests.exceptions.RequestException as e:
+        log.warning(f"[{order_code}] Erro fallback: {e}")
+
     return None
 
 def ja_tem_rastreio(order_code, package_code):
