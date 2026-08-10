@@ -50,6 +50,7 @@ def listar_pedidos_com_rastreio():
                     "filtrar_por_data_ate": __import__('datetime').datetime.now(
                         __import__('zoneinfo').ZoneInfo("America/Sao_Paulo")
                     ).strftime("%d/%m/%Y")
+                    "filtrar_apenas_inclusao": "S",   # ← ADICIONANDO FILTRO POR DATA DE INCLUSÃO.
                 }]
             }
             resp = _post_omie(payload)
