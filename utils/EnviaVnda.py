@@ -77,6 +77,22 @@ def ja_tem_rastreio(order_code, package_code):
         log.warning(f"[{order_code}] Erro ao verificar rastreio: {e}")
         return False
 
+def marcar_como_enviado(order_code, package_code):
+    """Marca o pacote como enviado via PATCH /ship — dispara e-mail de rastreio ao cliente."""
+    endpoint = f"{VNDA_BASE_URL}/api/v2/orders/{order_code}/packages/{package_code}/ship"
+    try:
+        resp = requests.patch(endpoint, headers=_headers(), timeout=30)
+        log.info(f"[{order_code}] PATCH ship status={resp.status_code}")
+        if resp.status_code == 204:
+            log.info(f"[{order_code}] ✅ Pacote marcado como enviado!")
+            return True
+        log.warning(f"[{order_code}] ⚠️ ship retornou {resp.status_code}: {resp.text[:200]}")
+        return False
+    except requests.exceptions.RequestException as e:
+        log.warning(f"[{order_code}] Erro ao chamar ship: {e}")
+        return False
+
+
 def incluir_rastreio(order_code, package_code, codigo, url="", company=""):
     endpoint = f"{VNDA_BASE_URL}/api/v2/orders/{order_code}/packages/{package_code}/trackings"
     body = {"code": codigo}
@@ -93,6 +109,8 @@ def incluir_rastreio(order_code, package_code, codigo, url="", company=""):
         log.info(f"[{order_code}]   Retorno: {resp.text[:300]}")
         if resp.status_code in (200, 201):
             log.info(f"[{order_code}] ✅ Rastreio incluido com sucesso! Status={resp.status_code}")
+            # Marca o pacote como enviado para disparar o e-mail ao cliente
+            marcar_como_enviado(order_code, package_code)
             return True
         log.warning(f"[{order_code}] ❌ Falha {resp.status_code}: {resp.text[:200]}")
         return False
