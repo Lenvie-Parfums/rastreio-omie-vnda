@@ -60,6 +60,7 @@ def buscar_package_code(order_code, max_retries=3):
     return None
 
 def ja_tem_rastreio(order_code, package_code):
+    """Verifica se já tem rastreio. Se tiver, marca como enviado e retorna True."""
     url = f"{VNDA_BASE_URL}/api/v2/orders/{order_code}/packages/{package_code}/trackings"
     try:
         resp = requests.get(url, headers=_headers(), timeout=30)
@@ -67,10 +68,10 @@ def ja_tem_rastreio(order_code, package_code):
         if resp.status_code == 200:
             trackings = resp.json()
             if isinstance(trackings, list):
-                # Verifica se tem ao menos um tracking com campo 'code' preenchido
                 validos = [t for t in trackings if t.get("code") or t.get("tracking_code")]
                 if validos:
-                    log.info(f"[{order_code}] Ja tem {len(validos)} rastreio(s) valido(s). Pulando.")
+                    log.info(f"[{order_code}] Ja tem rastreio. Marcando como enviado...")
+                    marcar_como_enviado(order_code, package_code)
                     return True
         return False
     except requests.exceptions.RequestException as e:
