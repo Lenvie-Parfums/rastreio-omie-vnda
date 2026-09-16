@@ -46,14 +46,19 @@ def sincronizar_rastreios():
             sem_order_code += 1
             continue
 
-        log.info(f"Processando pedido Vnda {order_code} "
-                 f"(rastreio: {pedido.get('codigo_rastreio') or pedido.get('url_rastreio')})")
+        etapa = pedido.get("etapa", "")
+        log.info(
+            f"Processando pedido Vnda {order_code} | "
+            f"etapa={etapa} | "
+            f"rastreio={pedido.get('codigo_rastreio') or pedido.get('url_rastreio') or '(sem URL)'}"
+        )
 
         sucesso = enviar_rastreio(
             order_code,
             pedido.get("codigo_rastreio", ""),
             pedido.get("url_rastreio", ""),
             pedido.get("transportadora", ""),
+            etapa,  # propaga etapa para controle do /ship
         )
         if sucesso:
             ok += 1
@@ -64,8 +69,8 @@ def sincronizar_rastreios():
 
     log.info("=" * 60)
     log.info("RESUMO (Omie -> Vnda)")
-    log.info(f"  Pedidos com rastreio:    {total}")
-    log.info(f"  Rastreios enviados:      {ok}")
+    log.info(f"  Pedidos processados:     {total}")
+    log.info(f"  Sucesso:                 {ok}")
     log.info(f"  Falhas:                  {falhas}")
     log.info(f"  Sem order_code Vnda:     {sem_order_code}")
     log.info("=" * 60)
