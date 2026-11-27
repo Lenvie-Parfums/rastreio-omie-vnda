@@ -1,4 +1,6 @@
+import json
 import logging
+import os
 import time
 import sys
 
@@ -32,12 +34,35 @@ def _order_code_da_vnda(pedido):
     )
 
 
+ARQUIVO_ESTADO = os.getenv("ARQUIVO_ESTADO", "estado_rastreio.json")
+
+
+def _carregar_estado():
+    try:
+        with open(ARQUIVO_ESTADO, encoding="utf-8") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return {}
+    except (ValueError, OSError) as e:
+        log.warning(f"Estado ilegível ({e}); começando do zero.")
+        return {}
+
+
+def _salvar_estado(estado):
+    with open(ARQUIVO_ESTADO, "w", encoding="utf-8") as f:
+        json.dump(estado, f, ensure_ascii=False, indent=0, sort_keys=True)
+
+
 def sincronizar_rastreios():
     pedidos = listar_pedidos_com_rastreio()
     total = len(pedidos)
     log.info(f"Pedidos com rastreio a processar: {total}")
 
-    ok = falhas = sem_order_code = 0
+    estado = _carregar_estado()
+    log.info(f"Estado carregado: {len(estado)} pedidos já sincronizados.")
+    novo_estado = {}
+
+    ok = falhas = sem_order_code = ja_sincronizados = 0
 
     for pedido in pedidos:
         order_code = str(_order_code_da_vnda(pedido)).strip()
@@ -47,6 +72,12 @@ def sincronizar_rastreios():
             continue
 
         etapa = pedido.get("etapa", "")
+        assinatura = {"url": pedido.get("url_rastreio", ""), "etapa": etapa}
+        if estado.get(order_code) == assinatura:
+            novo_estado[order_code] = assinatura
+            ja_sincronizados += 1
+            continue
+
         log.info(
             f"Processando pedido Vnda {order_code} | "
             f"etapa={etapa} | "
@@ -62,14 +93,19 @@ def sincronizar_rastreios():
         )
         if sucesso:
             ok += 1
+            novo_estado[order_code] = assinatura
         else:
             falhas += 1
 
         time.sleep(1)
 
+    # só guarda pedidos ainda na janela do Omie, para o arquivo não crescer sem limite
+    _salvar_estado(novo_estado)
+
     log.info("=" * 60)
     log.info("RESUMO (Omie -> Vnda)")
     log.info(f"  Pedidos processados:     {total}")
+    log.info(f"  Já sincronizados (pulo): {ja_sincronizados}")
     log.info(f"  Sucesso:                 {ok}")
     log.info(f"  Falhas:                  {falhas}")
     log.info(f"  Sem order_code Vnda:     {sem_order_code}")

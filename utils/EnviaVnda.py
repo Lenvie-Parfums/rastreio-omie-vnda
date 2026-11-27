@@ -63,26 +63,31 @@ def buscar_package_code(order_code, max_retries=3):
     return None
 
 
-def ja_tem_rastreio(order_code, package_code):
+def rastreios_na_vnda(order_code, package_code, max_retries=3):
     """
-    Verifica se já há rastreio registrado na Vnda.
-    Apenas leitura — não aciona /ship.
+    Lista os códigos de rastreio já gravados no pacote (apenas leitura).
+    Retorna None se não for possível confirmar — nesse caso o chamador NÃO deve gravar,
+    senão um timeout vira rastreio duplicado.
     """
     url = f"{VNDA_BASE_URL}/api/v2/orders/{order_code}/packages/{package_code}/trackings"
-    try:
-        resp = requests.get(url, headers=_headers(), timeout=30)
-        log.info(f"[{order_code}] GET trackings status={resp.status_code} retorno={resp.text[:200]}")
-        if resp.status_code == 200:
-            trackings = resp.json()
-            if isinstance(trackings, list):
-                validos = [t for t in trackings if t.get("code") or t.get("tracking_code")]
-                if validos:
-                    log.info(f"[{order_code}] Já tem rastreio na Vnda.")
-                    return True
-        return False
-    except requests.exceptions.RequestException as e:
-        log.warning(f"[{order_code}] Erro ao verificar rastreio: {e}")
-        return False
+    for tentativa in range(1, max_retries + 1):
+        try:
+            resp = requests.get(url, headers=_headers(), timeout=30)
+            log.info(f"[{order_code}] GET trackings status={resp.status_code} retorno={resp.text[:200]}")
+            if resp.status_code == 200:
+                trackings = resp.json()
+                if not isinstance(trackings, list):
+                    return []
+                return [
+                    (t.get("tracking_code") or t.get("code") or "").strip()
+                    for t in trackings
+                    if t.get("tracking_code") or t.get("code")
+                ]
+            log.warning(f"[{order_code}] GET trackings {resp.status_code} (tentativa {tentativa})")
+        except requests.exceptions.RequestException as e:
+            log.warning(f"[{order_code}] Erro ao verificar rastreio (tentativa {tentativa}): {e}")
+        time.sleep(5 * tentativa)
+    return None
 
 
 def marcar_como_enviado(order_code, package_code):
@@ -149,7 +154,19 @@ def enviar_rastreio(order_code, codigo_rastreio, url_rastreio="", transportadora
     if not package_code:
         return False
 
-    tem_rastreio = ja_tem_rastreio(order_code, package_code)
+    existentes = rastreios_na_vnda(order_code, package_code)
+    if existentes is None:
+        log.warning(f"[{order_code}] Não foi possível consultar os rastreios na Vnda — "
+                    f"não grava agora para não duplicar; tenta no próximo ciclo.")
+        return False
+
+    tem_rastreio = bool(existentes)
+    if tem_rastreio:
+        if codigo and codigo.strip() in existentes:
+            log.info(f"[{order_code}] Mesma URL já gravada na Vnda — não regrava.")
+        else:
+            log.warning(f"[{order_code}] Vnda já tem outro rastreio ({', '.join(existentes)}); "
+                        f"Omie tem {codigo or '(vazio)'} — mantido o da Vnda, não sobrescreve.")
 
     if not tem_rastreio:
         if codigo:

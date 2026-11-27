@@ -2,24 +2,39 @@ name: Sincronizar Rastreio (Omie -> Vnda)
 
 on:
   schedule:
-    # A cada 2 horas durante o horário comercial (SP = UTC-3)
-    - cron: '0 11,13,15,17,19,21 * * *'
+    # A cada 2 horas durante o horário comercial (SP = UTC-3).
+    # Minuto fora do :00 — o GitHub atrasa/descarta mais agendamentos na hora cheia.
+    - cron: '17 11,13,15,17,19,21 * * *'
   workflow_dispatch: {}
+
+# Nunca dois runs ao mesmo tempo (evita rastreio duplicado e "requisição já em execução" no Omie)
+concurrency:
+  group: sync-rastreio
+  cancel-in-progress: false
 
 jobs:
   sync:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
       - run: pip install -r requirements.txt
+
+      - name: Restaurar estado (pedidos já sincronizados)
+        uses: actions/cache@v4
+        with:
+          path: estado_rastreio.json
+          key: estado-rastreio-${{ github.run_id }}
+          restore-keys: estado-rastreio-
+
       - name: Rodar sincronizacao
         env:
           APP_KEY_OMIE:    ${{ secrets.APP_KEY_OMIE }}
           APP_SECRET:      ${{ secrets.APP_SECRET }}
-          DIAS_RETROATIVOS: ${{ secrets.DIAS_RETROATIVOS }}
+          DIAS_RETROATIVOS: ${{ vars.DIAS_RETROATIVOS }}
           VNDA_BASE_URL:   ${{ secrets.VNDA_BASE_URL }}
           VNDA_TOKEN:      ${{ secrets.VNDA_TOKEN }}
           VNDA_SHOP_HOST:  ${{ secrets.VNDA_SHOP_HOST }}

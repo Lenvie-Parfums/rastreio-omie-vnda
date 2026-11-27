@@ -1,5 +1,6 @@
 .env
 *.env
 !.env.example
+estado_rastreio.json
 __pycache__/
 *.pyc
