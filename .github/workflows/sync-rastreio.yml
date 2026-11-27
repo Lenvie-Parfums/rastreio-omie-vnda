@@ -16,7 +16,18 @@ jobs:
   sync:
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    permissions:
+      contents: read
+      actions: write   # necessário para o keep-alive reativar o workflow
     steps:
+      # Repositório público: o GitHub desliga agendamentos após 60 dias sem commit
+      # (aconteceu de 15/11 a 24/11/2026). Reativar a cada run renova esse prazo.
+      - name: Keep-alive do agendamento
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X PUT "repos/${{ github.repository }}/actions/workflows/sync-rastreio.yml/enable"
+
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
